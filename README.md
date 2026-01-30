@@ -1,4 +1,4 @@
-# FuseChain: Multimodal Crypto Fraud Detection System 🛡️
+# FuseChain: Multimodal Crypto Fraud Detection System
 
 FuseChain is an advanced AI system combining on-chain transaction analysis, market data, and social sentiment to detect fraudulent Ethereum addresses.
 
