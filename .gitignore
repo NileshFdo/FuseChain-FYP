@@ -1,0 +1,67 @@
+# General
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# PyCharm / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node.js / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm
+dist/
+build/
+coverage/
+.nyc_output/
+
+# Project Specific
+ml_pipeline/data/per_address
+ml_pipeline/data/raw
+ml_pipeline/data/weka
+ml_pipeline/data/processed/chain
+ml_pipeline/data/processed/market
+ml_pipeline/data/processed/reddit
+outputs/
+coverage.xml
+*.log
