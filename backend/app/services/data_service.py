@@ -6,7 +6,7 @@ import pandas as pd
 from typing import List, Optional, Dict
 from pathlib import Path
 
-from app.config import TRAIN_DATA_PATH, OFFCHAIN_DATA_PATH, ONCHAIN_FEATURES, OFFCHAIN_FEATURES
+from app.config import get_train_data_path, get_offchain_data_path, ONCHAIN_FEATURES, OFFCHAIN_FEATURES
 
 
 class DataService:
@@ -19,13 +19,15 @@ class DataService:
     
     def load_data(self):
         """Load datasets on startup"""
-        print(f"Loading training data from {TRAIN_DATA_PATH}...")
-        self._train_data = pd.read_parquet(TRAIN_DATA_PATH)
+        train_path = get_train_data_path()
+        print(f"Loading training data from {train_path}...")
+        self._train_data = pd.read_parquet(train_path)
         self._train_data['day'] = pd.to_datetime(self._train_data['day']).dt.strftime('%Y-%m-%d')
         print(f"Loaded {len(self._train_data):,} rows")
         
-        print(f"Loading off-chain data from {OFFCHAIN_DATA_PATH}...")
-        self._offchain_data = pd.read_parquet(OFFCHAIN_DATA_PATH)
+        offchain_path = get_offchain_data_path()
+        print(f"Loading off-chain data from {offchain_path}...")
+        self._offchain_data = pd.read_parquet(offchain_path)
         self._offchain_data['day'] = pd.to_datetime(self._offchain_data['day']).dt.strftime('%Y-%m-%d')
         print(f"Loaded {len(self._offchain_data):,} rows")
         
