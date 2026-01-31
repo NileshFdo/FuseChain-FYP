@@ -56,14 +56,10 @@ coverage/
 .nyc_output/
 
 # Project Specific
-ml_pipeline/data/per_address
-ml_pipeline/data/raw
-ml_pipeline/data/weka
-ml_pipeline/data/processed/chain
-ml_pipeline/data/processed/market
-ml_pipeline/data/processed/reddit
-ml_pipeline/data/processed/final/offchain_daily.csv
-ml_pipeline/data/processed/final/final_train_data.csv
+ml_pipeline/data/
+models/*.joblib
+*.parquet
+*.joblib
 outputs/
 coverage.xml
 *.log

@@ -8,7 +8,7 @@ import joblib
 from typing import List, Dict, Optional, Tuple
 import shap
 
-from app.config import MODEL_PATH, ALL_FEATURES, ONCHAIN_FEATURES, OFFCHAIN_FEATURES
+from app.config import get_model_path, ALL_FEATURES, ONCHAIN_FEATURES, OFFCHAIN_FEATURES
 
 
 class MLService:
@@ -21,8 +21,9 @@ class MLService:
     
     def load_model(self):
         """Load the trained XGBoost model"""
-        print(f"Loading model from {MODEL_PATH}...")
-        model_data = joblib.load(MODEL_PATH)
+        model_path = get_model_path()
+        print(f"Loading model from {model_path}...")
+        model_data = joblib.load(model_path)
         self._model = model_data['model']
         self._feature_columns = model_data['feature_columns']
         print(f"Model loaded with {len(self._feature_columns)} features")
