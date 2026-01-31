@@ -60,6 +60,7 @@ ml_pipeline/data/
 models/*.joblib
 *.parquet
 *.joblib
+*.json
 outputs/
 coverage.xml
 *.log
