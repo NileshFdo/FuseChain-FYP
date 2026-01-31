@@ -56,8 +56,8 @@ coverage/
 .nyc_output/
 
 # Project Specific
-ml_pipeline/data/
 models/
+ml_pipeline/data/
 outputs/
 coverage.xml
 *.log
