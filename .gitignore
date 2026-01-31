@@ -57,10 +57,7 @@ coverage/
 
 # Project Specific
 ml_pipeline/data/
-models/*.joblib
-*.parquet
-*.joblib
-*.json
+models/
 outputs/
 coverage.xml
 *.log
