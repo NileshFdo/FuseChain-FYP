@@ -1,0 +1,29 @@
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  sync-to-space:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: Nileshka/fusechain-backend
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "github-actions"
+
+          # Add Hugging Face Space as a remote
+          git remote add space https://huggingface.co/spaces/$HF_SPACE
+
+          # Authenticate using token (no password prompt)
+          git push https://user:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE main --force
