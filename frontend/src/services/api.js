@@ -2,7 +2,9 @@
  * API Service - Handles all API calls to the FastAPI backend
  */
 
-const API_BASE_URL = 'http://localhost:8000/api';
+import { API_URL } from '../config';
+
+const API_BASE_URL = API_URL;
 
 /**
  * Analyze a wallet address
@@ -11,12 +13,12 @@ const API_BASE_URL = 'http://localhost:8000/api';
  */
 export async function analyzeAddress(address) {
   const response = await fetch(`${API_BASE_URL}/predict/address/${address}`);
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to analyze address');
   }
-  
+
   return response.json();
 }
 
@@ -28,17 +30,17 @@ export async function analyzeAddress(address) {
 export async function uploadCSV(file) {
   const formData = new FormData();
   formData.append('file', file);
-  
+
   const response = await fetch(`${API_BASE_URL}/predict/csv`, {
     method: 'POST',
     body: formData,
   });
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || 'Failed to process CSV');
   }
-  
+
   return response.json();
 }
 
@@ -52,13 +54,13 @@ export async function getAddresses(search = '', limit = 100) {
   const params = new URLSearchParams();
   if (search) params.append('search', search);
   params.append('limit', limit.toString());
-  
+
   const response = await fetch(`${API_BASE_URL}/predict/addresses?${params}`);
-  
+
   if (!response.ok) {
     throw new Error('Failed to fetch addresses');
   }
-  
+
   return response.json();
 }
 

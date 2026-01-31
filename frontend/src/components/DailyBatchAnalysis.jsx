@@ -13,24 +13,44 @@ function DailyBatchAnalysis() {
 
     useEffect(() => {
         fetch(`${API_URL}/risk/available-dates`)
-            .then(res => res.json())
-            .then(data => {
-                setAvailableDates(data.dates);
-                if (data.dates.length > 0) setSelectedDate(data.dates[0]);
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to fetch dates');
+                return res.json();
             })
-            .catch(err => console.error(err));
+            .then(data => {
+                if (data.dates && Array.isArray(data.dates)) {
+                    setAvailableDates(data.dates);
+                    if (data.dates.length > 0) setSelectedDate(data.dates[0]);
+                } else {
+                    console.warn('No dates returned from API');
+                    setAvailableDates([]);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                setAvailableDates([]); // meaningful fallback
+            });
     }, []);
 
     const runScan = async () => {
         if (!selectedDate) return;
         setLoading(true);
+        setScanResult(null); // Clear previous result
         try {
             const q = `?threshold=${threshold}&only_anomalous=${onlyAnomalous}&limit=${limit}`;
             const res = await fetch(`${API_URL}/risk/scan-date/${selectedDate}${q}`);
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || `Scan failed: ${res.status}`);
+            }
+
             const data = await res.json();
+            if (!data.results) data.results = []; // Safety check
             setScanResult(data);
         } catch (err) {
             console.error(err);
+            alert(`Analysis failed: ${err.message}`);
         } finally {
             setLoading(false);
         }
