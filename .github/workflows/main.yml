@@ -28,4 +28,11 @@ jobs:
         run: |
           git config --global user.email "actions@github.com"
           git config --global user.name "github-actions"
-          git push https://user:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE master:main --force
+          
+          # Build a single-commit snapshot from current master contents
+          git checkout --orphan hf-snapshot
+          git add -A
+          git commit -m "Deploy snapshot"
+
+          # Push that snapshot to the Space's main branch
+          git push https://user:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE hf-snapshot:main --force
