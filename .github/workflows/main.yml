@@ -12,8 +12,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           lfs: true
 
+      - name: Setup Git LFS
+        run: |
+          git lfs install
+          git lfs fetch --all
+          git lfs checkout
+    
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -21,10 +28,4 @@ jobs:
         run: |
           git config --global user.email "actions@github.com"
           git config --global user.name "github-actions"
-
-          # Add Hugging Face Space as a remote
-          git remote add space https://huggingface.co/spaces/$HF_SPACE
-
-          # Authenticate using token (no password prompt)
           git push https://user:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE master:main --force
-
