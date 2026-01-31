@@ -62,6 +62,8 @@ ml_pipeline/data/weka
 ml_pipeline/data/processed/chain
 ml_pipeline/data/processed/market
 ml_pipeline/data/processed/reddit
+ml_pipeline/data/processed/final/offchain_daily.csv
+ml_pipeline/data/processed/final/final_train_data.csv
 outputs/
 coverage.xml
 *.log
