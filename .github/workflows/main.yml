@@ -2,7 +2,7 @@ name: Deploy to Hugging Face Space
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "master" ]
   workflow_dispatch:
 
 jobs:
@@ -26,4 +26,5 @@ jobs:
           git remote add space https://huggingface.co/spaces/$HF_SPACE
 
           # Authenticate using token (no password prompt)
-          git push https://user:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE main --force
+          git push https://user:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE master:main --force
+
