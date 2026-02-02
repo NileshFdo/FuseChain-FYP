@@ -461,12 +461,14 @@ async def list_sample_files():
                 "has_labels": False
             })
     else:
-        for name in SAMPLE_FILES:
-            date_str = name.replace("labeled_", "").replace("unlabeled_", "").replace(".csv", "").replace("_", "-")
+        for name, count in SAMPLE_FILES.items():
+            base = name.replace(".csv", "")
             if name.startswith("labeled_"):
-                labeled.append({"name": name, "addresses": 100, "date": date_str, "has_labels": True})
+                date_str = base.replace("labeled_", "").replace("_", "-")
+                labeled.append({"name": name, "addresses": count, "date": date_str, "has_labels": True})
             else:
-                unlabeled.append({"name": name, "addresses": 100, "date": date_str, "has_labels": False})
+                date_str = base.replace("unlabeled_", "").replace("_", "-")
+                unlabeled.append({"name": name, "addresses": count, "date": date_str, "has_labels": False})
     
     return {
         "labeled": sorted(labeled, key=lambda x: x["date"]),
