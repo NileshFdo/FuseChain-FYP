@@ -1,40 +1,32 @@
-"""
-Risk Assessment Router - Exchange Plugin API
-Provides endpoints for daily scanning and single address investigation
-"""
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict, List, Optional
+from pathlib import Path
 import pandas as pd
 import numpy as np
 
 from app.services import data_service, ml_service
-from app.config import ONCHAIN_FEATURES, OFFCHAIN_FEATURES, REDDIT_FEATURES, MARKET_FEATURES
+from app.config import (
+    ONCHAIN_FEATURES, OFFCHAIN_FEATURES, REDDIT_FEATURES, MARKET_FEATURES,
+    LOCAL_SAMPLE_DIR
+)
 
 router = APIRouter(prefix="/risk", tags=["risk-assessment"])
 
 
-# =============================================================================
-# Models
-# =============================================================================
-
 class RiskResult(BaseModel):
-    """Unified risk result for both scan and single lookup"""
     wallet_address: str
-    risk_score: float  # 0-100
+    risk_score: float
     is_flagged: bool
     top_reason: str
     detailed_reasons: List[str] = []
-    
-    # Feature Data
     on_chain_features: Dict[str, float]
     reddit_features: Dict[str, float]
     market_features: Dict[str, float]
 
 
 class DateScanResponse(BaseModel):
-    """Response for date-only scan"""
     scan_date: str
     total_wallets: int
     flagged_count: int
@@ -69,97 +61,89 @@ class FeatureAnalysis(BaseModel):
     value: float
     baseline: float
     change_pct: float
-    z_score: float # Pseudo z-score for UI display
-    explanation: str = "" # Dynamic explanation text
-
+    z_score: float
+    explanation: str = ""
 
 
 class AddressAnalysisResponse(BaseModel):
-    """Response for single address analysis with history context"""
     wallet_address: str
     date: str
     risk_score: float
     is_flagged: bool
-    
-    # Explanation
     top_reason: str
-    history_comparison: List[str]  # Legacy support
-    feature_analysis: List[FeatureAnalysis] # New structured data
-    
-    # Feature Data
+    history_comparison: List[str]
+    feature_analysis: List[FeatureAnalysis]
     on_chain_features: Dict[str, float]
     reddit_features: Dict[str, float]
     market_features: Dict[str, float]
-    
     has_history: bool
 
 
-# =============================================================================
-# Endpoints
-# =============================================================================
+class ValidationMetrics(BaseModel):
+    accuracy: float
+    precision: float
+    recall: float
+    f1_score: float
+    true_positives: int
+    true_negatives: int
+    false_positives: int
+    false_negatives: int
 
-@router.get("/scan-date/{date}", response_model=DateScanResponse)
+
+class BatchResultItem(BaseModel):
+    wallet_address: str
+    risk_score: float
+    is_flagged: bool
+    top_reason: str
+    on_chain_features: Dict[str, float]
+    reddit_features: Dict[str, float]
+    market_features: Dict[str, float]
+    ground_truth: Optional[bool] = None
+    is_correct: Optional[bool] = None
+
+
+class BatchAnalysisResponse(BaseModel):
+    analysis_date: str
+    total_addresses: int
+    flagged_count: int
+    high_risk_count: int
+    medium_risk_count: int
+    low_risk_count: int
+    results: List[BatchResultItem]
+    has_validation: bool = False
+    validation: Optional[ValidationMetrics] = None
+
+
+@router.get("/scan-date", response_model=DateScanResponse)
 async def scan_date(
     date: str,
     limit: Optional[int] = 100,
     only_anomalous: bool = False,
     threshold: float = 0.5
 ):
-    """
-    Scan all wallets for a specific date using internal training data.
-    Returns risk scores and top reasons.
-    """
-    # 1. Get train data for date
     train_data = data_service.train_data
-    date_data = train_data[train_data['day'] == date]
+    date_data = train_data[train_data['day'] == date].copy()
     
     if len(date_data) == 0:
-        raise HTTPException(status_code=404, detail=f"No activity found for {date}")
-
-    # 2. Get off-chain context
-    offchain_df = data_service.offchain_data
-    date_match = offchain_df[offchain_df['day'] == date]
+        raise HTTPException(status_code=404, detail=f"No data found for date {date}")
     
-    if len(date_match) == 0:
-        offchain_values = {col: float(offchain_df[col].mean()) for col in OFFCHAIN_FEATURES}
-    else:
-        offchain_values = {col: float(date_match[col].iloc[0]) for col in OFFCHAIN_FEATURES}
-
-    # 3. Prepare batch prediction
-    # Create a copy and fill off-chain features for all rows at once
-    predict_df = date_data.copy()
-    for col in OFFCHAIN_FEATURES:
-        predict_df[col] = offchain_values.get(col, 0)
-        
-    _, probabilities = ml_service.predict(predict_df)
+    _, probabilities = ml_service.predict(date_data)
     
     results = []
-    all_scores = []
+    all_probs = list(probabilities)
     
-    # 4. Process results
-    # Convert to list for iteration to match probabilities index
-    rows = date_data.to_dict('records')
-    
-    for idx, row in enumerate(rows):
+    for idx, (_, row) in enumerate(date_data.iterrows()):
         prob = float(probabilities[idx])
-        all_scores.append(prob)
-        
         is_flagged = prob >= threshold
         
         if only_anomalous and not is_flagged:
             continue
-            
-        # Explain (Top feature only for list view)
+        
         top_reason = "Normal activity"
         if is_flagged:
-            # Get contribution for this specific row
-            # We reconstruct the single row DF for SHAP
-            row_df = predict_df.iloc[[idx]]
-            contribs = ml_service.get_feature_contributions(row_df.iloc[0])
-            
+            contribs = ml_service.get_feature_contributions(row)
             all_contrib = {**contribs['on_chain'], **contribs['off_chain']}
             if all_contrib:
-                # Filter for positive contributions only
                 pos_contrib = {k: v for k, v in all_contrib.items() if v > 0}
                 if pos_contrib:
                     top_feature = max(pos_contrib.items(), key=lambda x: x[1])[0]
@@ -171,201 +155,140 @@ async def scan_date(
             is_flagged=is_flagged,
             top_reason=top_reason,
             on_chain_features={col: float(row[col]) for col in ONCHAIN_FEATURES},
-            reddit_features={col: offchain_values.get(col, 0) for col in REDDIT_FEATURES},
-            market_features={col: offchain_values.get(col, 0) for col in MARKET_FEATURES}
+            reddit_features={col: float(row[col]) for col in REDDIT_FEATURES},
+            market_features={col: float(row[col]) for col in MARKET_FEATURES}
         ))
     
-    # Sort by score desc
     results.sort(key=lambda x: x.risk_score, reverse=True)
     
-    # Apply limit
     if limit:
         results = results[:limit]
-        
-    max_prob = max(all_scores) if all_scores else 0.0
-    avg_prob = sum(all_scores) / len(all_scores) if all_scores else 0.0
     
     return DateScanResponse(
         scan_date=date,
         total_wallets=len(date_data),
-        flagged_count=sum(1 for p in all_scores if p >= threshold),
-        high_risk_count=sum(1 for p in all_scores if p >= 0.75),
-        medium_risk_count=sum(1 for p in all_scores if 0.5 <= p < 0.75),
-        low_risk_count=sum(1 for p in all_scores if p < 0.5),
-        max_probability=round(max_prob * 100, 1),
-        avg_probability=round(avg_prob * 100, 1),
+        flagged_count=sum(1 for p in all_probs if p >= threshold),
+        high_risk_count=sum(1 for p in all_probs if p >= 0.75),
+        medium_risk_count=sum(1 for p in all_probs if 0.5 <= p < 0.75),
+        low_risk_count=sum(1 for p in all_probs if p < 0.5),
+        max_probability=round(max(all_probs) * 100, 1),
+        avg_probability=round(np.mean(all_probs) * 100, 1),
         results=results
     )
 
 
 @router.get("/wallet-history/{address}", response_model=WalletHistoryResponse)
 async def get_wallet_history(address: str):
-    """
-    Get historical risk trend for a specific wallet
-    """
-    # 1. Get history
-    address_data = data_service.get_address_data(address)
-    if address_data is None or len(address_data) == 0:
-        raise HTTPException(status_code=404, detail=f"No history for {address}")
+    address = address.lower()
+    train_data = data_service.train_data
     
-    address_data = address_data.sort_values('day')
+    addr_data = train_data[train_data['address'] == address].copy()
     
-    # 2. Get off-chain data for all relevant days
-    offchain_df = data_service.offchain_data
+    if len(addr_data) == 0:
+        raise HTTPException(status_code=404, detail=f"No history found for address {address}")
     
-    # 3. Prepare batch prediction
-    predict_df = address_data.copy()
+    addr_data = addr_data.sort_values('day')
+    _, probabilities = ml_service.predict(addr_data)
     
-    # Efficiently merge offchain data
-    # We can't just assign dictionary logic easily, so we merge
-    # But offchain_df might not have all days if data is missing, so we fill
-    
-    # Merge on day
-    predict_df = pd.merge(predict_df, offchain_df[['day'] + OFFCHAIN_FEATURES], on='day', how='left')
-    
-    # Fill missing offchain with means
-    for col in OFFCHAIN_FEATURES:
-        if col not in predict_df.columns:
-            predict_df[col] = float(offchain_df[col].mean())
-        else:
-            predict_df[col] = predict_df[col].fillna(float(offchain_df[col].mean()))
-            
-    # 4. Predict
-    _, probabilities = ml_service.predict(predict_df)
-    
-    history_points = []
-    
-    for idx, (i, row) in enumerate(address_data.iterrows()):
+    history = []
+    for idx, (_, row) in enumerate(addr_data.iterrows()):
         prob = float(probabilities[idx])
         is_flagged = prob >= 0.5
         
         top_reason = "Normal"
         if is_flagged:
-            # We skip detailed shap for history to keep it fast, unless needed
-            top_reason = "Anomalous" 
-            
-        history_points.append(HistoryPoint(
-            date=row['day'],
+            contribs = ml_service.get_feature_contributions(row)
+            all_contrib = {**contribs['on_chain'], **contribs['off_chain']}
+            if all_contrib:
+                pos_contrib = {k: v for k, v in all_contrib.items() if v > 0}
+                if pos_contrib:
+                    top_feature = max(pos_contrib.items(), key=lambda x: x[1])[0]
+                    top_reason = format_feature_name(top_feature)
+        
+        history.append(HistoryPoint(
+            date=str(row['day']),
             risk_score=round(prob * 100, 1),
             is_flagged=is_flagged,
             top_reason=top_reason
         ))
-        
-
     
-    # Calculate stats
-    avg_score = sum(p.risk_score for p in history_points) / len(history_points) if history_points else 0
-    avg_tx = float(address_data['normal_total_cnt'].mean())
-    avg_eth = float(address_data['normal_sent_cnt'].mean()) # Using sent_cnt as proxy since volume data is not available in standard features
-    # 'normal_sent_cnt' is "Sent Tx Count", we will display this.
-    # We might not have total volume in standard features. We will use 'normal_sent_cnt' as proxy.
-    # Let's use 'normal_sent_cnt' and label it 'Avg Max Sent ETH' or just 'Avg Sent ETH' for demo.
+    avg_score = np.mean([h.risk_score for h in history])
+    avg_tx = addr_data['normal_total_cnt'].mean() if 'normal_total_cnt' in addr_data.columns else 0
+    avg_sent = addr_data['normal_sent_cnt'].mean() if 'normal_sent_cnt' in addr_data.columns else 0
     
-    stats = HistoryStats(
-        days_analyzed=len(history_points),
-        avg_risk_score=round(avg_score, 2),
-        avg_daily_tx=round(avg_tx, 1),
-        avg_sent_eth=round(avg_eth, 2)
-    )
-
     return WalletHistoryResponse(
         address=address,
-        history=history_points,
-        stats=stats
+        history=history,
+        stats=HistoryStats(
+            days_analyzed=len(history),
+            avg_risk_score=round(avg_score, 1),
+            avg_daily_tx=round(avg_tx, 1),
+            avg_sent_eth=round(avg_sent, 2)
+        )
     )
 
 
 @router.get("/analyze-address", response_model=AddressAnalysisResponse)
 async def analyze_address(address: str, date: str):
-    """
-    Look up address + date and provide detailed explanation comparing to history.
-    """
-    # 1. Get history
-    address_data = data_service.get_address_data(address)
-    if address_data is None or len(address_data) == 0:
-        raise HTTPException(status_code=404, detail=f"No history for {address}")
+    address = address.lower()
+    train_data = data_service.train_data
     
-    # 2. Find target day
-    target_row = address_data[address_data['day'] == date]
-    if len(target_row) == 0:
-        raise HTTPException(status_code=404, detail=f"No activity on {date}")
+    row_data = train_data[(train_data['address'] == address) & (train_data['day'] == date)]
     
-    row = target_row.iloc[0]
+    if len(row_data) == 0:
+        raise HTTPException(status_code=404, detail=f"No data found for address {address} on {date}")
     
-    # 3. Get off-chain
-    offchain_df = data_service.offchain_data
-    date_match = offchain_df[offchain_df['day'] == date]
-    if len(date_match) == 0:
-        offchain_values = {col: float(offchain_df[col].mean()) for col in OFFCHAIN_FEATURES}
-    else:
-        offchain_values = {col: float(date_match[col].iloc[0]) for col in OFFCHAIN_FEATURES}
-        
-    # 4. Predict
-    feature_row = row.to_dict()
-    for col in OFFCHAIN_FEATURES:
-        feature_row[col] = offchain_values.get(col, 0)
+    row = row_data.iloc[0]
     
-    df = pd.DataFrame([feature_row])
-    _, probabilities = ml_service.predict(df)
-    prob = float(probabilities[0])
+    _, prob = ml_service.predict(row_data)
+    prob = float(prob[0])
     is_flagged = prob >= 0.5
     
-    # 5. Generate "vs History" Explanation
-    # Find top contributing on-chain features
-    contribs = ml_service.get_feature_contributions(df.iloc[0])
-    # Filter only positive contributors
-    pos_contribs = {k: v for k, v in contribs['on_chain'].items() if v > 0}
+    history_data = train_data[train_data['address'] == address]
+    has_history = len(history_data) > 1
     
-    # Sort by contribution
-    sorted_features = sorted(pos_contribs.items(), key=lambda x: x[1], reverse=True)
-    top_features = [k for k, v in sorted_features[:3]] # Top 3
-    
+    feature_analysis = []
     history_comparison = []
-    feature_analysis_list = []
     
-    # Select features to analyze (top contributors + key metrics)
-    # We always include key metrics even if they aren't top contributors for the "Detection Analysis" cards
-    key_metrics = ['normal_total_cnt', 'normal_sent_cnt', 'uniq_peers_cnt', 'eth_volatility_7d', 'reddit_avg_sentiment']
+    for feat in ONCHAIN_FEATURES + OFFCHAIN_FEATURES:
+        val = float(row[feat])
+        
+        if has_history:
+            avg = float(history_data[feat].mean())
+            std = float(history_data[feat].std()) if len(history_data) > 1 else 1.0
+            z = (val - avg) / std if std > 0 else 0
+            pct = ((val - avg) / avg * 100) if avg != 0 else 0
+        else:
+            avg = float(train_data[feat].mean())
+            std = float(train_data[feat].std())
+            z = (val - avg) / std if std > 0 else 0
+            pct = ((val - avg) / avg * 100) if avg != 0 else 0
+        
+        explanation = generate_explanation(feat, val, avg, pct, abs(z)) if abs(z) > 1 else ""
+        
+        feature_analysis.append(FeatureAnalysis(
+            feature=format_feature_name(feat),
+            value=round(val, 2),
+            baseline=round(avg, 2),
+            change_pct=round(pct, 1),
+            z_score=round(z, 2),
+            explanation=explanation
+        ))
+        
+        if abs(z) > 2:
+            direction = "above" if z > 0 else "below"
+            history_comparison.append(f"{format_feature_name(feat)} is {abs(pct):.0f}% {direction} baseline")
     
-    # Calculate baseline for all features
-    history_minus_target = address_data[address_data['day'] != date]
+    top_reason = "Normal activity"
+    if is_flagged:
+        contribs = ml_service.get_feature_contributions(row)
+        all_contrib = {**contribs['on_chain'], **contribs['off_chain']}
+        if all_contrib:
+            pos_contrib = {k: v for k, v in all_contrib.items() if v > 0}
+            if pos_contrib:
+                top_feature = max(pos_contrib.items(), key=lambda x: x[1])[0]
+                top_reason = f"High {format_feature_name(top_feature)}"
     
-    if len(history_minus_target) > 0:
-        for feature in key_metrics:
-            if feature not in feature_row: continue
-            
-            val = float(feature_row[feature])
-            avg = float(history_minus_target[feature].mean())
-            std = float(history_minus_target[feature].std())
-            
-            if avg == 0: avg = 0.001
-            if std == 0: std = 1.0 # Prevent div by zero
-            
-            pct = ((val - avg) / avg) * 100
-            z = (val - avg) / std
-            
-            feature_analysis_list.append(FeatureAnalysis(
-                feature=format_feature_name(feature),
-                value=round(val, 2),
-                baseline=round(avg, 2),
-                change_pct=round(pct, 1),
-                z_score=round(z, 2),
-                explanation=generate_explanation(feature, val, avg, pct, z)
-            ))
-            
-            # Logic for text explanation (only for significant ones)
-            if feature in top_features and pct > 50:
-                 fname = format_feature_name(feature)
-                 history_comparison.append(
-                    f"{fname}: {val:.1f} (vs Avg {avg:.1f}, +{pct:.0f}%)"
-                 )
-
-    top_reason = "Normal Activity"
-    if history_comparison:
-        top_reason = "Anomalous spike in activity compared to history"
-    elif is_flagged:
-        top_reason = "Complex pattern anomaly detected"
-
     return AddressAnalysisResponse(
         wallet_address=address,
         date=date,
@@ -373,23 +296,193 @@ async def analyze_address(address: str, date: str):
         is_flagged=is_flagged,
         top_reason=top_reason,
         history_comparison=history_comparison,
-        feature_analysis=feature_analysis_list,
+        feature_analysis=feature_analysis,
         on_chain_features={col: float(row[col]) for col in ONCHAIN_FEATURES},
-        reddit_features={col: offchain_values.get(col, 0) for col in REDDIT_FEATURES},
-        market_features={col: offchain_values.get(col, 0) for col in MARKET_FEATURES},
-        has_history=True
+        reddit_features={col: float(row[col]) for col in REDDIT_FEATURES},
+        market_features={col: float(row[col]) for col in MARKET_FEATURES},
+        has_history=has_history
     )
 
 
 @router.get("/available-dates")
 async def get_available_dates():
     train_data = data_service.train_data
-    dates = train_data['day'].unique().tolist()
-    dates.sort(reverse=True)
-    return {"dates": dates[:100]}
+    dates = sorted(train_data['day'].unique(), reverse=True)
+    return {"dates": [str(d) for d in dates]}
 
 
-def format_feature_name(name: str) -> str:
+@router.post("/analyze-batch", response_model=BatchAnalysisResponse)
+async def analyze_batch(file: UploadFile = File(...), threshold: float = 0.5):
+    try:
+        content = await file.read()
+        content_str = content.decode('utf-8')
+        df = pd.read_csv(pd.io.common.StringIO(content_str))
+        df.columns = df.columns.str.strip()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {str(e)}")
+    
+    if 'address' not in df.columns:
+        raise HTTPException(status_code=400, detail="CSV must have 'address' column")
+    
+    df['address'] = df['address'].str.lower()
+    
+    if 'date' in df.columns:
+        analysis_date = str(df['date'].iloc[0])
+    else:
+        analysis_date = "unknown"
+    
+    for col in ONCHAIN_FEATURES:
+        if col not in df.columns:
+            df[col] = 0
+    
+    offchain_df = data_service.offchain_data
+    date_match = offchain_df[offchain_df['day'] == analysis_date]
+    
+    if len(date_match) > 0:
+        offchain_values = {col: float(date_match[col].iloc[0]) for col in OFFCHAIN_FEATURES}
+    else:
+        offchain_values = {col: float(offchain_df[col].mean()) for col in OFFCHAIN_FEATURES}
+    
+    for col in OFFCHAIN_FEATURES:
+        df[col] = offchain_values[col]
+    
+    _, probabilities = ml_service.predict(df)
+    
+    has_ground_truth = 'Class' in df.columns
+    ground_truth_map = {}
+    if has_ground_truth:
+        ground_truth_map = dict(zip(df['address'], df['Class'].astype(int) == 1))
+    
+    results = []
+    all_scores = []
+    TP, TN, FP, FN = 0, 0, 0, 0
+    
+    for idx, row in df.iterrows():
+        prob = float(probabilities[idx])
+        all_scores.append(prob)
+        is_flagged = prob >= threshold
+        address = row['address']
+        
+        top_reason = "Normal activity"
+        if is_flagged:
+            contribs = ml_service.get_feature_contributions(row)
+            all_contrib = {**contribs['on_chain'], **contribs['off_chain']}
+            if all_contrib:
+                pos_contrib = {k: v for k, v in all_contrib.items() if v > 0}
+                if pos_contrib:
+                    top_feature = max(pos_contrib.items(), key=lambda x: x[1])[0]
+                    top_reason = f"High {format_feature_name(top_feature)}"
+        
+        gt = ground_truth_map.get(address)
+        is_correct = None
+        
+        if gt is not None:
+            is_correct = (is_flagged == gt)
+            if is_flagged and gt:
+                TP += 1
+            elif not is_flagged and not gt:
+                TN += 1
+            elif is_flagged and not gt:
+                FP += 1
+            else:
+                FN += 1
+        
+        results.append(BatchResultItem(
+            wallet_address=address,
+            risk_score=round(prob * 100, 1),
+            is_flagged=is_flagged,
+            top_reason=top_reason,
+            on_chain_features={col: float(row[col]) for col in ONCHAIN_FEATURES},
+            reddit_features={col: offchain_values.get(col, 0) for col in REDDIT_FEATURES},
+            market_features={col: offchain_values.get(col, 0) for col in MARKET_FEATURES},
+            ground_truth=gt,
+            is_correct=is_correct
+        ))
+    
+    results.sort(key=lambda x: x.risk_score, reverse=True)
+    
+    validation = None
+    if has_ground_truth and (TP + TN + FP + FN) > 0:
+        total = TP + TN + FP + FN
+        accuracy = (TP + TN) / total
+        precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+        recall = TP / (TP + FN) if (TP + FN) > 0 else 0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+        
+        validation = ValidationMetrics(
+            accuracy=round(accuracy, 3),
+            precision=round(precision, 3),
+            recall=round(recall, 3),
+            f1_score=round(f1, 3),
+            true_positives=TP,
+            true_negatives=TN,
+            false_positives=FP,
+            false_negatives=FN
+        )
+    
+    return BatchAnalysisResponse(
+        analysis_date=analysis_date,
+        total_addresses=len(df),
+        flagged_count=sum(1 for p in all_scores if p >= threshold),
+        high_risk_count=sum(1 for p in all_scores if p >= 0.75),
+        medium_risk_count=sum(1 for p in all_scores if 0.5 <= p < 0.75),
+        low_risk_count=sum(1 for p in all_scores if p < 0.5),
+        results=results,
+        has_validation=has_ground_truth,
+        validation=validation
+    )
+
+
+@router.get("/sample-files")
+async def list_sample_files():
+    if not LOCAL_SAMPLE_DIR.exists():
+        return {"labeled": [], "unlabeled": []}
+    
+    labeled = []
+    unlabeled = []
+    
+    for f in LOCAL_SAMPLE_DIR.glob("labeled_*.csv"):
+        df = pd.read_csv(f)
+        date_str = f.stem.replace("labeled_", "").replace("_", "-")
+        labeled.append({
+            "name": f.name,
+            "addresses": len(df),
+            "date": date_str,
+            "has_labels": True
+        })
+    
+    for f in LOCAL_SAMPLE_DIR.glob("unlabeled_*.csv"):
+        df = pd.read_csv(f)
+        date_str = f.stem.replace("unlabeled_", "").replace("_", "-")
+        unlabeled.append({
+            "name": f.name,
+            "addresses": len(df),
+            "date": date_str,
+            "has_labels": False
+        })
+    
+    return {
+        "labeled": sorted(labeled, key=lambda x: x["date"]),
+        "unlabeled": sorted(unlabeled, key=lambda x: x["date"])
+    }
+
+
+@router.get("/sample-files/{filename}")
+async def download_sample_file(filename: str):
+    from app.config import get_sample_file_path
+    
+    try:
+        file_path = get_sample_file_path(filename)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"File {filename} not found")
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"File {filename} not found")
+    
+    return FileResponse(path=file_path, filename=filename, media_type="text/csv")
+
+
+def format_feature_name(name):
     names = {
         'normal_total_cnt': 'Tx Count',
         'uniq_peers_cnt': 'Unique Peers',
@@ -404,22 +497,20 @@ def format_feature_name(name: str) -> str:
     }
     return names.get(name, name.replace('_', ' ').title())
 
-def generate_explanation(feature: str, val: float, avg: float, pct: float, z: float) -> str:
-    """Generates dynamic explanation based on feature and magnitude"""
+
+def generate_explanation(feature, val, avg, pct, z):
     if z < 0.5:
         return ""
     
-    desc = format_feature_name(feature)
-    
     if feature == 'normal_total_cnt':
-        return f"CRITICAL: Extreme spike in transaction frequency. This address executed {int(val)} transactions compared to its typical {avg:.1f} per day - a {pct:.0f}% increase indicating potential automated fraud activity."
-    elif feature == 'normal_sent_cnt': # Using sent_cnt as proxy for volume if needed, or normal_sent_max_val
-        return f"CRITICAL: abnormal outgoing activity. Sent {int(val)} transactions vs baseline {avg:.1f}. High burst of outgoing transfers."
+        return f"Extreme spike in transaction frequency. {int(val)} transactions vs typical {avg:.1f} ({pct:.0f}% increase)."
+    elif feature == 'normal_sent_cnt':
+        return f"Abnormal outgoing activity. Sent {int(val)} transactions vs baseline {avg:.1f}."
     elif feature == 'uniq_peers_cnt':
-        return f"CRITICAL: This address contacted {int(val)} unique addresses in one day versus its normal {avg:.1f}. This pattern is consistent with distribution/collection fraud schemes."
+        return f"Contacted {int(val)} unique addresses vs normal {avg:.1f}. Pattern consistent with distribution schemes."
     elif feature == 'eth_volatility_7d':
-        return f"WARNING: Anomalous activity coincides with significant market volatility ({val:.1f}). Combined signals strengthen fraud probability."
+        return f"Activity coincides with market volatility ({val:.1f})."
     elif feature == 'reddit_avg_sentiment':
-         return f"WARNING: Increased negative sentiment detected in r/ethereum subreddit on this date."
-         
-    return f"Significant deviation in {desc} ({pct:.0f}% above baseline). This represents a massive deviation from normal patterns."
+        return f"Negative sentiment detected in crypto communities."
+    
+    return f"Significant deviation in {format_feature_name(feature)} ({pct:.0f}% above baseline)."
