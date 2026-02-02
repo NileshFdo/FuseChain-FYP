@@ -59,5 +59,5 @@ The core model is an **XGBoost Classifier** trained on:
 *   **Social Signals**: Sentiment analysis from r/ethereum discussions.
 
 Key performance metrics:
-*   **Accuracy**: ~75.4%
-*   **AUC-ROC**: 0.83
+*   **Accuracy**: 72.0%
+*   **AUC-ROC**: 0.79

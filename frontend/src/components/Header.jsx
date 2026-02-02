@@ -1,4 +1,3 @@
-
 function Header({ activeTab, setActiveTab }) {
     const tabs = [
         { id: 'daily', label: 'Daily Analysis' },
@@ -23,7 +22,7 @@ function Header({ activeTab, setActiveTab }) {
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors
-                    ${activeTab === tab.id
+                                        ${activeTab === tab.id
                                             ? 'border-blue-500 text-white'
                                             : 'border-transparent text-slate-400 hover:border-slate-600 hover:text-slate-200'
                                         }`}
