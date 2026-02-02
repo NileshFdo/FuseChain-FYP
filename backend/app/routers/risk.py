@@ -435,31 +435,38 @@ async def analyze_batch(file: UploadFile = File(...), threshold: float = 0.5):
 
 @router.get("/sample-files")
 async def list_sample_files():
-    if not LOCAL_SAMPLE_DIR.exists():
-        return {"labeled": [], "unlabeled": []}
+    from app.config import SAMPLE_FILES
     
     labeled = []
     unlabeled = []
     
-    for f in LOCAL_SAMPLE_DIR.glob("labeled_*.csv"):
-        df = pd.read_csv(f)
-        date_str = f.stem.replace("labeled_", "").replace("_", "-")
-        labeled.append({
-            "name": f.name,
-            "addresses": len(df),
-            "date": date_str,
-            "has_labels": True
-        })
-    
-    for f in LOCAL_SAMPLE_DIR.glob("unlabeled_*.csv"):
-        df = pd.read_csv(f)
-        date_str = f.stem.replace("unlabeled_", "").replace("_", "-")
-        unlabeled.append({
-            "name": f.name,
-            "addresses": len(df),
-            "date": date_str,
-            "has_labels": False
-        })
+    if LOCAL_SAMPLE_DIR.exists():
+        for f in LOCAL_SAMPLE_DIR.glob("labeled_*.csv"):
+            df = pd.read_csv(f)
+            date_str = f.stem.replace("labeled_", "").replace("_", "-")
+            labeled.append({
+                "name": f.name,
+                "addresses": len(df),
+                "date": date_str,
+                "has_labels": True
+            })
+        
+        for f in LOCAL_SAMPLE_DIR.glob("unlabeled_*.csv"):
+            df = pd.read_csv(f)
+            date_str = f.stem.replace("unlabeled_", "").replace("_", "-")
+            unlabeled.append({
+                "name": f.name,
+                "addresses": len(df),
+                "date": date_str,
+                "has_labels": False
+            })
+    else:
+        for name in SAMPLE_FILES:
+            date_str = name.replace("labeled_", "").replace("unlabeled_", "").replace(".csv", "").replace("_", "-")
+            if name.startswith("labeled_"):
+                labeled.append({"name": name, "addresses": 100, "date": date_str, "has_labels": True})
+            else:
+                unlabeled.append({"name": name, "addresses": 100, "date": date_str, "has_labels": False})
     
     return {
         "labeled": sorted(labeled, key=lambda x: x["date"]),
