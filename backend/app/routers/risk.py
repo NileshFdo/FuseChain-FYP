@@ -440,40 +440,18 @@ async def list_sample_files():
     labeled = []
     unlabeled = []
     
-    if LOCAL_SAMPLE_DIR.exists():
-        for f in LOCAL_SAMPLE_DIR.glob("labeled_*.csv"):
-            df = pd.read_csv(f)
-            date_str = f.stem.replace("labeled_", "").replace("_", "-")
-            labeled.append({
-                "name": f.name,
-                "addresses": len(df),
-                "date": date_str,
-                "has_labels": True
-            })
+    for name, count in SAMPLE_FILES.items():
+        date_str = name.split("_", 1)[1].replace(".csv", "").replace("_", "-")
+        entry = {"name": name, "addresses": count, "date": date_str}
         
-        for f in LOCAL_SAMPLE_DIR.glob("unlabeled_*.csv"):
-            df = pd.read_csv(f)
-            date_str = f.stem.replace("unlabeled_", "").replace("_", "-")
-            unlabeled.append({
-                "name": f.name,
-                "addresses": len(df),
-                "date": date_str,
-                "has_labels": False
-            })
-    else:
-        for name, count in SAMPLE_FILES.items():
-            base = name.replace(".csv", "")
-            if name.startswith("labeled_"):
-                date_str = base.replace("labeled_", "").replace("_", "-")
-                labeled.append({"name": name, "addresses": count, "date": date_str, "has_labels": True})
-            else:
-                date_str = base.replace("unlabeled_", "").replace("_", "-")
-                unlabeled.append({"name": name, "addresses": count, "date": date_str, "has_labels": False})
+        if name.startswith("labeled_"):
+            entry["has_labels"] = True
+            labeled.append(entry)
+        else:
+            entry["has_labels"] = False
+            unlabeled.append(entry)
     
-    return {
-        "labeled": sorted(labeled, key=lambda x: x["date"]),
-        "unlabeled": sorted(unlabeled, key=lambda x: x["date"])
-    }
+    return {"labeled": labeled, "unlabeled": unlabeled}
 
 
 @router.get("/sample-files/{filename}")
