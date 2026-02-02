@@ -58,16 +58,16 @@ def get_offchain_data_path():
 LOCAL_SAMPLE_DIR = BASE_DIR / "ml_pipeline" / "data" / "sample_batches"
 
 SAMPLE_FILES = [
-    "labeled_2018_08_01.csv",
-    "labeled_2018_08_07.csv",
-    "labeled_2018_08_20.csv",
-    "labeled_2018_09_05.csv",
-    "labeled_2018_09_15.csv",
-    "unlabeled_2018_08_01.csv",
-    "unlabeled_2018_08_07.csv",
-    "unlabeled_2018_08_20.csv",
-    "unlabeled_2018_09_05.csv",
-    "unlabeled_2018_09_15.csv",
+    "labeled_2021_10_06.csv",
+    "labeled_2021_10_08.csv",
+    "labeled_2021_10_12.csv",
+    "labeled_2021_10_13.csv",
+    "labeled_2021_10_15.csv",
+    "unlabeled_2021_10_06.csv",
+    "unlabeled_2021_10_08.csv",
+    "unlabeled_2021_10_12.csv",
+    "unlabeled_2021_10_13.csv",
+    "unlabeled_2021_10_15.csv",
 ]
 
 
