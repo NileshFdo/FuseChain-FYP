@@ -4,18 +4,18 @@ sdk: docker
 app_port: 7860
 ---
 
-This is the backend API for my project.
+# FuseChain: Multimodal Ethereum Scam Classification System
 
-# FuseChain: Multimodal Crypto Fraud Detection System
+FuseChain is a supervised scam classification system that fuses on-chain Ethereum transaction features with off-chain contextual signals — market dynamics, Reddit sentiment, and Twitter engagement — to classify EOA addresses as scam or normal.
 
-FuseChain is a system combining on-chain transaction analysis, market data, and social sentiment to detect fraudulent Ethereum addresses.
+Unlike conventional on-chain-only approaches, FuseChain operates at the **address level**, aggregating a behavioural profile across each EOA's full transaction history and the prevailing off-chain conditions during its operational period.
 
-## Project Overview
+## Project Architecture
 
-This repo contains three main components:
-1.  **Backend (FastAPI)**: Serves the ML model via REST API endpoints.
-2.  **Frontend (React + Tailwind)**: Interactive dashboard for analysts to visualize risk scores and explanations.
-3.  **ML Pipeline**: Notebooks and scripts for data processing, feature engineering, and model training.
+This repository operates on three decoupled components:
+1. **Backend (FastAPI)**: Serves the XGBoost classifier via REST API endpoints, with pre-loaded feature caches for zero-latency inference and SHAP-based explainability.
+2. **Frontend (React + Tailwind)**: Interactive dashboard for analysts to visualise risk scores, SHAP feature contributions, narrative explanations, and batch analysis results.
+3. **ML Pipeline**: Eight-notebook pipeline that processes raw data through temporal alignment, address-level aggregation, SHAP feature selection, and model training.
 
 ## Setup Instructions
 
@@ -50,14 +50,3 @@ cd ml_pipeline
 pip install -r requirements.txt
 jupyter lab
 ```
-
-## Model Architecture
-
-The core model is an **XGBoost Classifier** trained on:
-*   **On-Chain Features**: Transaction frequency, volume, unique peers.
-*   **Market data**: Price volatility, market cap trends during activity periods.
-*   **Social Signals**: Sentiment analysis from r/ethereum discussions.
-
-Key performance metrics:
-*   **Accuracy**: 72.0%
-*   **AUC-ROC**: 0.79

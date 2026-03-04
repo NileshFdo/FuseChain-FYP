@@ -1,9 +1,8 @@
 function Header({ activeTab, setActiveTab }) {
     const tabs = [
-        { id: 'daily', label: 'Daily Analysis' },
+        { id: 'daily', label: 'Batch Analysis' },
         { id: 'single', label: 'Single Address' },
         { id: 'test', label: 'Test Samples' },
-        { id: 'model', label: 'Model Details' },
     ];
 
     return (

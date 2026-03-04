@@ -3,7 +3,7 @@ import Header from './components/Header';
 import DailyBatchAnalysis from './components/DailyBatchAnalysis';
 import SingleAddressSearch from './components/SingleAddressSearch';
 import TestExamples from './components/TestExamples';
-import ModelDetails from './components/ModelDetails';
+
 import './index.css';
 
 function getInitialState() {
@@ -15,13 +15,12 @@ function getInitialState() {
     if (queryString) {
       const params = new URLSearchParams(queryString);
       const address = params.get('address');
-      const date = params.get('date');
       const auto = params.get('auto') === 'true';
 
       if (address) {
         return {
           tab: 'single',
-          searchState: { address, date, autoAnalyze: auto }
+          searchState: { address, autoAnalyze: auto }
         };
       }
     }
@@ -36,7 +35,6 @@ function getInitialState() {
           tab: 'single',
           searchState: {
             address: data.address,
-            date: data.date,
             autoAnalyze: data.autoAnalyze || false
           }
         };
@@ -63,7 +61,7 @@ function App() {
         {activeTab === 'daily' && <DailyBatchAnalysis />}
         {activeTab === 'single' && <SingleAddressSearch initialState={initialSearchState} />}
         {activeTab === 'test' && <TestExamples />}
-        {activeTab === 'model' && <ModelDetails />}
+
       </main>
     </div>
   );
