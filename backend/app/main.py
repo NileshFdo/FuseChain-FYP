@@ -13,6 +13,7 @@ async def lifespan(app: FastAPI):
     print("Backend Starting...")
     print("=" * 60)
     
+    # Pre-load datasets and the ML model into memory upon startup
     data_service.load_data()
     ml_service.load_model()
     
@@ -21,7 +22,7 @@ async def lifespan(app: FastAPI):
     print("=" * 60)
     
     yield
-    
+
     print("Shutting Down...")
 
 
@@ -40,11 +41,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register the risk assessment routes
 app.include_router(risk_router, prefix=API_PREFIX)
 
 
 @app.get("/")
 async def root():
+    """Root endpoint to acknowledge API is running and provide links."""
     return {
         "name": "FuseChain API",
         "version": "1.0.0",
@@ -54,4 +57,5 @@ async def root():
 
 @app.get("/health")
 async def health_check():
+    """Basic health check endpoint for monitoring."""
     return {"status": "healthy"}

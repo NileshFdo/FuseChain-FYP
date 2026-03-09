@@ -45,26 +45,6 @@ export async function uploadCSV(file) {
 }
 
 /**
- * Get list of available addresses via search autocomplete
- * @param {string} search - Partial search string
- * @param {number} limit - Maximum results to return
- * @returns {Promise<Object>} Search results
- */
-export async function getAddresses(search = '', limit = 100) {
-  const params = new URLSearchParams();
-  if (search) params.append('prefix', search);
-  params.append('limit', limit.toString());
-
-  const response = await fetch(`${API_BASE_URL}/risk/search?${params}`);
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch addresses');
-  }
-
-  return response.json();
-}
-
-/**
  * Health check
  * @returns {Promise<Object>} Health status
  */

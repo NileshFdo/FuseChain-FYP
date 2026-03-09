@@ -9,6 +9,11 @@ from app.config import (
 
 
 class DataService:
+    """
+    Singleton service responsible for loading the parquet dataset
+    into memory once upon application startup. It provides fast in-memory 
+    lookups for single addresses and batched search queries.
+    """
 
     def __init__(self):
         self._address_data = None
@@ -45,17 +50,6 @@ class DataService:
             self.load_data()
         return self._stats_cache.get(feature)
 
-    def get_addresses(self, search: Optional[str] = None, limit: int = 100) -> List[str]:
-        if self._address_cache is None:
-            self.load_data()
-
-        addresses = self._address_cache
-        if search:
-            search_lower = search.lower()
-            addresses = [a for a in addresses if search_lower in a.lower()]
-
-        return addresses[:limit]
-
     def get_address_profile(self, address: str) -> Optional[pd.Series]:
         """Return the single-row profile for the given address, or None."""
         mask = self.address_data['address'].str.lower() == address.lower()
@@ -71,7 +65,10 @@ class DataService:
         return address.lower() in [a.lower() for a in self._address_cache]
 
     def extract_features(self, row: pd.Series) -> Dict[str, Dict[str, float]]:
-        """Group features by modality for the API response."""
+        """
+        Takes a single Pandas Series (address profile) and splits its features
+        into the four distinct modalities (On-chain, Market, Reddit, Twitter).
+        """
         on_chain = {col: float(row.get(col, 0)) for col in ONCHAIN_FEATURES if col in row.index}
         market = {col: float(row.get(col, 0)) for col in MARKET_FEATURES if col in row.index}
         reddit = {col: float(row.get(col, 0)) for col in REDDIT_FEATURES if col in row.index}

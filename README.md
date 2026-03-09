@@ -6,7 +6,7 @@ app_port: 7860
 
 # FuseChain: Multimodal Ethereum Scam Classification System
 
-FuseChain is a supervised scam classification system that fuses on-chain Ethereum transaction features with off-chain contextual signals — market dynamics, Reddit sentiment, and Twitter engagement — to classify EOA addresses as scam or normal.
+FuseChain is a supervised scam classification system that fuses on-chain Ethereum transaction features with off-chain contextual signals market dynamics, Reddit sentiment, and Twitter engagement to classify EOA addresses as scam or normal.
 
 Unlike conventional on-chain-only approaches, FuseChain operates at the **address level**, aggregating a behavioural profile across each EOA's full transaction history and the prevailing off-chain conditions during its operational period.
 

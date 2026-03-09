@@ -11,6 +11,11 @@ from app.config import (
 
 
 class MLService:
+    """
+    Singleton service responsible for loading the trained XGBoost model and SHAP explainer
+    into memory. Handles the actual inference logic and generates explainable narratives 
+    based on SHAP output.
+    """
 
     def __init__(self):
         self._model = None
@@ -51,7 +56,11 @@ class MLService:
         return self._optimal_threshold
 
     def predict(self, df: pd.DataFrame):
-        """Return (predictions, probabilities) for each row in df."""
+        """
+        Batched inference method.
+        Converts the pandas dataframe to an XGBoost DMatrix for optimized prediction.
+        Returns: Tuple(binary_predictions, float_probabilities)
+        """
         import xgboost as xgb
 
         feature_cols = list(self._feature_columns)
@@ -152,7 +161,11 @@ class MLService:
             return f"{direction} {display_name}."
 
     def generate_narrative(self, contributions: dict, profile: pd.Series, verdict: str, risk_score: float, n: int = 5):
-        """Generate a full narrative paragraph explaining the prediction."""
+        """
+        Constructs a human-readable narrative explaining 'why' the model made its decision.
+        It identifies the dominant data modality (On-chain vs Twitter vs Reddit, etc.)
+        and crafts an opening sentence, followed by specific details from the top SHAP features.
+        """
         all_contribs = {}
         modality_impact = {}
         for modality, group in contributions.items():
