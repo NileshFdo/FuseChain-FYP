@@ -12,7 +12,7 @@ const API_BASE_URL = API_URL;
  * @returns {Promise<Object>} Analysis results
  */
 export async function analyzeAddress(address) {
-  const response = await fetch(`${API_BASE_URL}/predict/address/${address}`);
+  const response = await fetch(`${API_BASE_URL}/risk/analyze/${address}`);
 
   if (!response.ok) {
     const error = await response.json();
@@ -23,15 +23,15 @@ export async function analyzeAddress(address) {
 }
 
 /**
- * Upload CSV for analysis
- * @param {File} file - CSV file with on-chain features
+ * Upload CSV for batch analysis
+ * @param {File} file - CSV file with addresses
  * @returns {Promise<Object>} Analysis results
  */
 export async function uploadCSV(file) {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${API_BASE_URL}/predict/csv`, {
+  const response = await fetch(`${API_BASE_URL}/risk/analyze-batch`, {
     method: 'POST',
     body: formData,
   });
@@ -45,17 +45,17 @@ export async function uploadCSV(file) {
 }
 
 /**
- * Get list of available addresses
- * @param {string} search - Optional search filter
+ * Get list of available addresses via search autocomplete
+ * @param {string} search - Partial search string
  * @param {number} limit - Maximum results to return
- * @returns {Promise<Object>} List of addresses
+ * @returns {Promise<Object>} Search results
  */
 export async function getAddresses(search = '', limit = 100) {
   const params = new URLSearchParams();
-  if (search) params.append('search', search);
+  if (search) params.append('prefix', search);
   params.append('limit', limit.toString());
 
-  const response = await fetch(`${API_BASE_URL}/predict/addresses?${params}`);
+  const response = await fetch(`${API_BASE_URL}/risk/search?${params}`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch addresses');

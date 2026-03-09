@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from '../config';
 
-function FileTable({ files, title, description, badgeColor, badgeText, onDownload }) {
+function FileTable({ files, title, description, onDownload }) {
     return (
         <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
                 <h3 className="text-lg font-bold text-slate-100">{title}</h3>
-                <span className={`text-xs ${badgeColor} px-2 py-0.5 rounded-full`}>{badgeText}</span>
             </div>
             <p className="text-slate-400 text-sm mb-4">{description}</p>
 
@@ -15,7 +14,6 @@ function FileTable({ files, title, description, badgeColor, badgeText, onDownloa
                     <thead className="bg-slate-950">
                         <tr>
                             <th className="px-6 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">File Name</th>
-                            <th className="px-6 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Date</th>
                             <th className="px-6 py-3 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">Addresses</th>
                             <th className="px-6 py-3 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">Download</th>
                         </tr>
@@ -24,7 +22,6 @@ function FileTable({ files, title, description, badgeColor, badgeText, onDownloa
                         {files.map((file, i) => (
                             <tr key={i} className="hover:bg-slate-800 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-slate-300">{file.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{file.date}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400">{file.addresses}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
                                     <button
@@ -80,8 +77,8 @@ function TestExamples() {
                     <div className="text-sm text-blue-200">
                         <p><strong className="font-semibold">Two types of samples:</strong></p>
                         <ul className="mt-2 space-y-1">
-                            <li>• <span className="text-emerald-300 font-medium">Labeled</span> - Contains Class column for validation (shows accuracy metrics)</li>
-                            <li>• <span className="text-orange-300 font-medium">Unlabeled</span> - No labels (blind testing, like production)</li>
+                            <li>• <span className="text-slate-300 font-medium">Labeled</span> - Contains Class column for validation (shows accuracy metrics)</li>
+                            <li>• <span className="text-slate-300 font-medium">Unlabeled</span> - No labels (blind testing, like production)</li>
                         </ul>
                     </div>
                 </div>
@@ -95,8 +92,6 @@ function TestExamples() {
                         files={labeledFiles}
                         title="Labeled Samples"
                         description="CSVs with ground truth labels - model predictions will be compared with actual anomaly/normal status"
-                        badgeColor="bg-emerald-800/50 text-emerald-200"
-                        badgeText="Validation"
                         onDownload={downloadFile}
                     />
 
@@ -104,8 +99,6 @@ function TestExamples() {
                         files={unlabeledFiles}
                         title="Unlabeled Samples"
                         description="CSVs without labels - simulates real production scenario where labels are unknown"
-                        badgeColor="bg-orange-800/50 text-orange-200"
-                        badgeText="Blind Test"
                         onDownload={downloadFile}
                     />
                 </>

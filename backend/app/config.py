@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import Path
 
 try:
@@ -16,13 +17,15 @@ HF_DATA_REPO_ID = "Nileshka/fusechain-data"
 HF_MODEL_REPO_TYPE = "model"
 HF_DATA_REPO_TYPE = "dataset"
 
-MODEL_FILENAME = "xgboost_model.joblib"
-TRAIN_DATA_FILENAME = "final_train_data.parquet"
-OFFCHAIN_DATA_FILENAME = "offchain_daily.parquet"
+MODEL_FILENAME = "xgboost_address_model.joblib"
+ADDRESS_DATA_FILENAME = "address_level_fused.parquet"
+METADATA_FILENAME = "address_features_metadata.json"
 
 LOCAL_MODEL_PATH = MODELS_DIR / MODEL_FILENAME
-LOCAL_TRAIN_DATA_PATH = DATA_DIR / TRAIN_DATA_FILENAME
-LOCAL_OFFCHAIN_DATA_PATH = DATA_DIR / OFFCHAIN_DATA_FILENAME
+LOCAL_ADDRESS_DATA_PATH = DATA_DIR / ADDRESS_DATA_FILENAME
+LOCAL_METADATA_PATH = MODELS_DIR / METADATA_FILENAME
+
+LOCAL_SAMPLE_DIR = MODELS_DIR
 
 
 def get_path(local_path, filename, repo_id, repo_type):
@@ -48,88 +51,70 @@ def get_path(local_path, filename, repo_id, repo_type):
 def get_model_path():
     return get_path(LOCAL_MODEL_PATH, MODEL_FILENAME, HF_MODEL_REPO_ID, repo_type=HF_MODEL_REPO_TYPE)
 
-def get_train_data_path():
-    return get_path(LOCAL_TRAIN_DATA_PATH, TRAIN_DATA_FILENAME, HF_DATA_REPO_ID, repo_type=HF_DATA_REPO_TYPE)
+def get_address_data_path():
+    return get_path(LOCAL_ADDRESS_DATA_PATH, ADDRESS_DATA_FILENAME, HF_DATA_REPO_ID, repo_type=HF_DATA_REPO_TYPE)
 
-def get_offchain_data_path():
-    return get_path(LOCAL_OFFCHAIN_DATA_PATH, OFFCHAIN_DATA_FILENAME, HF_DATA_REPO_ID, repo_type=HF_DATA_REPO_TYPE)
-
-
-LOCAL_SAMPLE_DIR = BASE_DIR / "ml_pipeline" / "data" / "sample_batches"
-
-SAMPLE_FILES = {
-    "labeled_2021_10_06.csv": 260,
-    "labeled_2021_10_08.csv": 253,
-    "labeled_2021_10_12.csv": 260,
-    "labeled_2021_10_13.csv": 256,
-    "labeled_2021_10_15.csv": 252,
-    "unlabeled_2021_10_06.csv": 260,
-    "unlabeled_2021_10_08.csv": 253,
-    "unlabeled_2021_10_12.csv": 260,
-    "unlabeled_2021_10_13.csv": 256,
-    "unlabeled_2021_10_15.csv": 252,
-}
-
+def get_metadata_path():
+    return get_path(LOCAL_METADATA_PATH, METADATA_FILENAME, HF_MODEL_REPO_ID, repo_type=HF_MODEL_REPO_TYPE)
 
 def get_sample_file_path(filename):
+    """Get path to a sample CSV, local-first with HuggingFace fallback."""
     local_path = LOCAL_SAMPLE_DIR / filename
     if local_path.exists():
         return local_path
-
-    if hf_hub_download is None:
-        raise FileNotFoundError(f"Sample file not found: {filename}")
-    
-    print(f"Downloading sample file {filename} from HuggingFace...")
-    downloaded_path = hf_hub_download(
-        repo_id=HF_DATA_REPO_ID,
-        filename=f"sample_batches/{filename}",
-        repo_type=HF_DATA_REPO_TYPE
-    )
-    return Path(downloaded_path)
+    return get_path(local_path, filename, HF_MODEL_REPO_ID, repo_type=HF_MODEL_REPO_TYPE)
 
 
-def list_available_sample_files():
-    if LOCAL_SAMPLE_DIR.exists():
-        labeled = list(LOCAL_SAMPLE_DIR.glob("labeled_*.csv"))
-        unlabeled = list(LOCAL_SAMPLE_DIR.glob("unlabeled_*.csv"))
-        return labeled + unlabeled
-    return SAMPLE_FILES
+# ---------------------------------------------------------------------------
+# Load feature lists dynamically from metadata JSON
+# ---------------------------------------------------------------------------
+
+def _load_feature_metadata():
+    """Load feature groups from address_features_metadata.json."""
+    meta_path = get_metadata_path()
+    with open(meta_path, 'r') as f:
+        meta = json.load(f)
+    return meta
+
+def _auto_display_name(feature_name: str) -> str:
+    """Convert a snake_case feature name to a human-readable display name."""
+    # Remove common suffixes for cleaner names
+    name = feature_name
+    for prefix in ['market_', 'reddit_', 'twitter_']:
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+            break
+
+    # Convert snake_case to Title Case
+    parts = name.replace('_', ' ').split()
+    # Capitalize meaningful words
+    result = []
+    for p in parts:
+        if p in ('eth', 'tx', '7d', '30d', '5m', 'cnt', 'std', 'avg'):
+            result.append(p.upper())
+        elif p == 'min':
+            result.append('Min')
+        else:
+            result.append(p.capitalize())
+    return ' '.join(result)
 
 
-ONCHAIN_FEATURES = [
-    'normal_total_cnt',
-    'uniq_peers_cnt',
-    'burst_max_tx_5m',
-    'normal_sent_cnt',
-]
+_meta = _load_feature_metadata()
 
-REDDIT_FEATURES = [
-    'reddit_fraud_mention_ratio',
-    'reddit_total_activity',
-    'reddit_avg_sentiment',
-]
+ONCHAIN_FEATURES = _meta.get('onchain_features', [])
+MARKET_FEATURES = _meta.get('market_features', [])
+REDDIT_FEATURES = _meta.get('reddit_features', [])
+TWITTER_FEATURES = _meta.get('twitter_features', [])
 
-MARKET_FEATURES = [
-    'eth_volatility_7d',
-    'eth_daily_return',
-    'eth_intraday_volatility',
-]
-
-OFFCHAIN_FEATURES = REDDIT_FEATURES + MARKET_FEATURES
+OFFCHAIN_FEATURES = MARKET_FEATURES + REDDIT_FEATURES + TWITTER_FEATURES
 ALL_FEATURES = ONCHAIN_FEATURES + OFFCHAIN_FEATURES
+
+print(f"Loaded features from metadata: {len(ALL_FEATURES)} total "
+      f"({len(ONCHAIN_FEATURES)} on-chain, {len(MARKET_FEATURES)} market, "
+      f"{len(REDDIT_FEATURES)} reddit, {len(TWITTER_FEATURES)} twitter)")
 
 API_PREFIX = ""
 CORS_ORIGINS = ["*"]
 
-FEATURE_DISPLAY_NAMES = {
-    'normal_total_cnt': 'Tx Count',
-    'uniq_peers_cnt': 'Unique Peers',
-    'burst_max_tx_5m': 'Burst (5m)',
-    'normal_sent_cnt': 'Sent Tx',
-    'reddit_fraud_mention_ratio': 'Fraud Ratio',
-    'reddit_total_activity': 'Social Activity',
-    'reddit_avg_sentiment': 'Sentiment',
-    'eth_volatility_7d': 'Vol (7d)',
-    'eth_daily_return': 'Daily Return',
-    'eth_intraday_volatility': 'Intraday Vol'
-}
+# Auto-generate display names from feature names
+FEATURE_DISPLAY_NAMES = {feat: _auto_display_name(feat) for feat in ALL_FEATURES}

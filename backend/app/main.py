@@ -27,8 +27,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="FuseChain API",
-    description="Ethereum Wallet Anomaly Detection",
-    version="1.0.0",
+    description="Ethereum Address-Level Scam Classification",
+    version="2.0.0",
     lifespan=lifespan
 )
 

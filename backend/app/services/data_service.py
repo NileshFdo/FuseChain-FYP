@@ -1,94 +1,87 @@
 import pandas as pd
 from typing import List, Optional, Dict
-from pathlib import Path
 
-from app.config import get_train_data_path, get_offchain_data_path, ONCHAIN_FEATURES, OFFCHAIN_FEATURES
+from app.config import (
+    get_address_data_path,
+    ONCHAIN_FEATURES, MARKET_FEATURES, REDDIT_FEATURES, TWITTER_FEATURES,
+    ALL_FEATURES, FEATURE_DISPLAY_NAMES,
+)
 
 
 class DataService:
-    
+
     def __init__(self):
-        self._train_data = None
-        self._offchain_data = None
+        self._address_data = None
         self._address_cache = None
-    
+        self._stats_cache = None
+
     def load_data(self):
-        train_path = get_train_data_path()
-        print(f"Loading training data from {train_path}...")
-        self._train_data = pd.read_parquet(train_path)
-        self._train_data['day'] = pd.to_datetime(self._train_data['day']).dt.strftime('%Y-%m-%d')
-        print(f"Loaded {len(self._train_data):,} rows")
-        
-        offchain_path = get_offchain_data_path()
-        print(f"Loading off-chain data from {offchain_path}...")
-        self._offchain_data = pd.read_parquet(offchain_path)
-        self._offchain_data['day'] = pd.to_datetime(self._offchain_data['day']).dt.strftime('%Y-%m-%d')
-        print(f"Loaded {len(self._offchain_data):,} rows")
-        
-        self._address_cache = self._train_data['address'].unique().tolist()
-        print(f"Cached {len(self._address_cache):,} unique addresses")
-    
+        data_path = get_address_data_path()
+        print(f"Loading address-level data from {data_path}...")
+        self._address_data = pd.read_parquet(data_path)
+        self._address_cache = self._address_data['address'].unique().tolist()
+        print(f"Loaded {len(self._address_data):,} address profiles")
+
+        # Pre-compute per-feature mean/std for narrative comparisons
+        numeric_cols = [c for c in ALL_FEATURES if c in self._address_data.columns]
+        self._stats_cache = {}
+        for col in numeric_cols:
+            series = self._address_data[col].dropna()
+            self._stats_cache[col] = {
+                'mean': float(series.mean()),
+                'std': float(series.std()),
+                'median': float(series.median()),
+            }
+
     @property
-    def train_data(self):
-        if self._train_data is None:
+    def address_data(self):
+        if self._address_data is None:
             self.load_data()
-        return self._train_data
-    
-    @property
-    def offchain_data(self):
-        if self._offchain_data is None:
+        return self._address_data
+
+    def get_feature_stats(self, feature: str):
+        """Return pre-computed {mean, std, median} for a feature, or None."""
+        if self._stats_cache is None:
             self.load_data()
-        return self._offchain_data
-    
-    def get_addresses(self, search=None, limit=100):
+        return self._stats_cache.get(feature)
+
+    def get_addresses(self, search: Optional[str] = None, limit: int = 100) -> List[str]:
         if self._address_cache is None:
             self.load_data()
-        
+
         addresses = self._address_cache
         if search:
             search_lower = search.lower()
             addresses = [a for a in addresses if search_lower in a.lower()]
-        
+
         return addresses[:limit]
-    
-    def get_address_data(self, address):
-        mask = self.train_data['address'].str.lower() == address.lower()
-        data = self.train_data[mask].copy()
-        
-        if len(data) == 0:
+
+    def get_address_profile(self, address: str) -> Optional[pd.Series]:
+        """Return the single-row profile for the given address, or None."""
+        mask = self.address_data['address'].str.lower() == address.lower()
+        matches = self.address_data[mask]
+
+        if len(matches) == 0:
             return None
-        return data.sort_values('day')
-    
-    def address_exists(self, address):
+        return matches.iloc[0]
+
+    def address_exists(self, address: str) -> bool:
         if self._address_cache is None:
             self.load_data()
         return address.lower() in [a.lower() for a in self._address_cache]
-    
-    def merge_with_offchain(self, onchain_df):
-        # make sure dates match
-        onchain_df = onchain_df.copy()
-        onchain_df['day'] = pd.to_datetime(onchain_df['day']).dt.strftime('%Y-%m-%d')
-        
-        merged = pd.merge(onchain_df, self.offchain_data, on='day', how='left')
-        
-        # fill missing offchain with 0
-        for col in OFFCHAIN_FEATURES:
-            if col in merged.columns:
-                merged[col] = merged[col].fillna(0)
-            else:
-                merged[col] = 0
-        
-        return merged
-    
-    def validate_csv_columns(self, df):
-        required = ['address', 'day'] + ONCHAIN_FEATURES
-        missing = [col for col in required if col not in df.columns]
-        return len(missing) == 0, missing
-    
-    def extract_features(self, row):
-        on_chain = {col: float(row.get(col, 0)) for col in ONCHAIN_FEATURES}
-        off_chain = {col: float(row.get(col, 0)) for col in OFFCHAIN_FEATURES}
-        return {'on_chain': on_chain, 'off_chain': off_chain}
+
+    def extract_features(self, row: pd.Series) -> Dict[str, Dict[str, float]]:
+        """Group features by modality for the API response."""
+        on_chain = {col: float(row.get(col, 0)) for col in ONCHAIN_FEATURES if col in row.index}
+        market = {col: float(row.get(col, 0)) for col in MARKET_FEATURES if col in row.index}
+        reddit = {col: float(row.get(col, 0)) for col in REDDIT_FEATURES if col in row.index}
+        twitter = {col: float(row.get(col, 0)) for col in TWITTER_FEATURES if col in row.index}
+        return {
+            'on_chain': on_chain,
+            'market': market,
+            'reddit': reddit,
+            'twitter': twitter,
+        }
 
 
 data_service = DataService()
