@@ -11,6 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 MODELS_DIR = BASE_DIR / "models"
 DATA_DIR = BASE_DIR / "ml_pipeline" / "data" / "processed" / "final"
 
+# Hugging Face Repository Identifiers
 HF_MODEL_REPO_ID = "Nileshka/fusechain-model"
 HF_DATA_REPO_ID = "Nileshka/fusechain-data"
 
@@ -21,6 +22,7 @@ MODEL_FILENAME = "xgboost_address_model.joblib"
 ADDRESS_DATA_FILENAME = "address_level_fused.parquet"
 METADATA_FILENAME = "address_features_metadata.json"
 
+# local paths
 LOCAL_MODEL_PATH = MODELS_DIR / MODEL_FILENAME
 LOCAL_ADDRESS_DATA_PATH = DATA_DIR / ADDRESS_DATA_FILENAME
 LOCAL_METADATA_PATH = MODELS_DIR / METADATA_FILENAME
@@ -29,6 +31,10 @@ LOCAL_SAMPLE_DIR = MODELS_DIR
 
 
 def get_path(local_path, filename, repo_id, repo_type):
+    """
+    First checks if the necessary artifact is available on the local disk.
+    If not found attempts to download it from the Hugging Face Hub.
+    """
     if local_path.exists():
         print(f"Found local file: {local_path}")
         return local_path
@@ -49,25 +55,27 @@ def get_path(local_path, filename, repo_id, repo_type):
 
 
 def get_model_path():
+    """Retrieve the path to the trained XGBoost model artifact."""
     return get_path(LOCAL_MODEL_PATH, MODEL_FILENAME, HF_MODEL_REPO_ID, repo_type=HF_MODEL_REPO_TYPE)
 
 def get_address_data_path():
+    """Retrieve the path to the parquet dataset containing address profiles."""
     return get_path(LOCAL_ADDRESS_DATA_PATH, ADDRESS_DATA_FILENAME, HF_DATA_REPO_ID, repo_type=HF_DATA_REPO_TYPE)
 
 def get_metadata_path():
+    """Retrieve the path to the feature mapping metadata JSON."""
     return get_path(LOCAL_METADATA_PATH, METADATA_FILENAME, HF_MODEL_REPO_ID, repo_type=HF_MODEL_REPO_TYPE)
 
 def get_sample_file_path(filename):
-    """Get path to a sample CSV, local-first with HuggingFace fallback."""
+    """Get path to a sample CSV"""
     local_path = LOCAL_SAMPLE_DIR / filename
     if local_path.exists():
         return local_path
     return get_path(local_path, filename, HF_MODEL_REPO_ID, repo_type=HF_MODEL_REPO_TYPE)
 
 
-# ---------------------------------------------------------------------------
+
 # Load feature lists dynamically from metadata JSON
-# ---------------------------------------------------------------------------
 
 def _load_feature_metadata():
     """Load feature groups from address_features_metadata.json."""

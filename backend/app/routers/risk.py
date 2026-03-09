@@ -19,6 +19,9 @@ router = APIRouter(prefix="/risk", tags=["risk-assessment"])
 # ---------------------------------------------------------------------------
 
 class ShapFeature(BaseModel):
+    """
+    Schema for a single feature's SHAP contribution.
+    """
     feature: str
     display_name: str
     shap_value: float
@@ -27,6 +30,11 @@ class ShapFeature(BaseModel):
 
 
 class RiskResult(BaseModel):
+    """
+    Comprehensive schema returned for a single address analysis.
+    Contains the prediction, probability, human-readable narrative, 
+    and all detailed feature values for UI display.
+    """
     wallet_address: str
     risk_score: float
     is_flagged: bool
@@ -73,9 +81,7 @@ class BatchAnalysisResponse(BaseModel):
     validation: Optional[ValidationMetrics] = None
 
 
-# ---------------------------------------------------------------------------
 # Endpoints
-# ---------------------------------------------------------------------------
 
 @router.get("/analyze/{address}", response_model=RiskResult)
 async def analyze_address(address: str):
@@ -91,17 +97,17 @@ async def analyze_address(address: str):
     # Predict
     prediction, probability = ml_service.predict_single(profile)
 
-    # SHAP explanations
+    # SHAP explanations for transparency and UI
     contributions = ml_service.get_feature_contributions(profile)
     verdict = "Scam" if prediction == 1 else "Normal"
     top_reasons = ml_service.generate_top_reasons(contributions, profile=profile, n=5)
     narrative = ml_service.generate_narrative(contributions, profile, verdict, float(probability))
     top_shap = ml_service.get_top_shap_features(contributions, profile=profile, n=8)
 
-    # Feature breakdowns
+    # Dictionary of all raw feature values for the UI tables
     features = data_service.extract_features(profile)
 
-    # Flatten SHAP for optional UI drill-down
+    # Flatten the SHAP contributions to send to the frontend seamlessly
     flat_shap = {}
     for group in contributions.values():
         flat_shap.update(group)
@@ -120,13 +126,6 @@ async def analyze_address(address: str):
         twitter_features=features['twitter'],
         shap_contributions=flat_shap,
     )
-
-
-@router.get("/search")
-async def search_addresses(q: Optional[str] = None, limit: int = 20):
-    """Search for addresses in the dataset (autocomplete for the UI)."""
-    addresses = data_service.get_addresses(search=q, limit=limit)
-    return {"addresses": addresses, "count": len(addresses)}
 
 
 @router.post("/analyze-batch", response_model=BatchAnalysisResponse)
@@ -155,8 +154,11 @@ async def analyze_batch(file: UploadFile = File(...), threshold: float = 0.5):
         if profile is None:
             continue
 
+        # Make the prediction against the loaded XGBoost model
         prediction, probability = ml_service.predict_single(profile)
         is_flagged = float(probability) >= threshold
+        
+        # Generate SHAP explanations for this specific address
         contributions = ml_service.get_feature_contributions(profile)
         top_reasons = ml_service.generate_top_reasons(contributions)
         verdict = "Scam" if is_flagged else "Normal"
@@ -185,11 +187,13 @@ async def analyze_batch(file: UploadFile = File(...), threshold: float = 0.5):
             is_correct=is_correct,
         ))
 
+    # Categorize results strictly for the frontend dashboard
     high = sum(1 for r in results if r.risk_score >= 0.75)
     medium = sum(1 for r in results if 0.4 <= r.risk_score < 0.75)
     low = sum(1 for r in results if r.risk_score < 0.4)
 
     validation = None
+    # Calculate performance metrics ONLY if ground-truth labels were provided in the CSV
     if has_labels and (tp + tn + fp + fn) > 0:
         total = tp + tn + fp + fn
         validation = ValidationMetrics(
