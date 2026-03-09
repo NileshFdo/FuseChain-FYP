@@ -2,8 +2,8 @@ import { useState, useRef } from 'react';
 import { API_URL } from '../config';
 
 const RISK_THRESHOLD = 0.5;
-const HIGH_RISK_THRESHOLD = 75;
-const MEDIUM_RISK_THRESHOLD = 50;
+const HIGH_RISK_THRESHOLD = 0.75;
+const MEDIUM_RISK_THRESHOLD = 0.5;
 
 function DailyBatchAnalysis() {
     const [scanResult, setScanResult] = useState(null);
@@ -53,7 +53,6 @@ function DailyBatchAnalysis() {
     const handleAddressClick = (result) => {
         const params = new URLSearchParams({
             address: result.wallet_address,
-            date: scanResult.analysis_date,
             auto: 'true'
         });
         window.open(`/#single-search?${params.toString()}`, '_blank');
@@ -69,15 +68,14 @@ function DailyBatchAnalysis() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
             <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 p-6 mb-8">
                 <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-slate-100">Daily Batch Analysis</h2>
-                    <span className="text-slate-400 text-sm font-medium uppercase tracking-wide">Upload Transaction CSV</span>
+                    <h2 className="text-2xl font-bold text-slate-100">Batch Address Analysis</h2>
+                    <span className="text-slate-400 text-sm font-medium uppercase tracking-wide">Upload Address List CSV</span>
                 </div>
 
                 <div className="bg-blue-900/20 border border-blue-900/50 rounded-lg p-4 flex gap-3 mb-6">
-                    <span className="text-xl">ℹ️</span>
                     <p className="text-sm text-blue-200 leading-relaxed">
-                        <strong>Upload Mode:</strong> Upload a CSV with on-chain features (address, date, features).
-                        <br /><span className="text-blue-300 text-xs mt-1 block">Click any address to open in new tab.</span>
+                        <strong>Upload Mode:</strong> Upload a CSV with a column containing Ethereum addresses. The model will analyze each address.
+                        <br /><span className="text-blue-300 text-xs mt-1 block">Click any address to open its dedicated profile in a new tab.</span>
                     </p>
                 </div>
 
@@ -187,7 +185,7 @@ function DailyBatchAnalysis() {
                     </div>
 
                     <h3 className="text-lg font-bold text-slate-100 mb-4 pl-2 border-l-4 border-blue-500">
-                        Results for {scanResult.analysis_date}
+                        Results
                     </h3>
 
                     <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
@@ -200,7 +198,7 @@ function DailyBatchAnalysis() {
                                         <th className="px-6 py-3 text-left text-xs font-bold text-slate-400 uppercase">Status</th>
                                         {scanResult.has_validation && <th className="px-6 py-3 text-left text-xs font-bold text-slate-400 uppercase">Truth</th>}
                                         {scanResult.has_validation && <th className="px-6 py-3 text-center text-xs font-bold text-slate-400 uppercase">Correct</th>}
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-slate-400 uppercase">Indicator</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-slate-400 uppercase">Top Reasons</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800">
@@ -214,7 +212,7 @@ function DailyBatchAnalysis() {
                                                 {r.wallet_address.slice(0, 10)}...{r.wallet_address.slice(-6)}
                                             </td>
                                             <td className={`px-6 py-4 text-sm font-bold ${getRiskColor(r.risk_score)}`}>
-                                                {r.risk_score}%
+                                                {(r.risk_score * 100).toFixed(1)}%
                                             </td>
                                             <td className="px-6 py-4 text-sm">
                                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.is_flagged ? 'bg-red-900/30 text-red-300' : 'bg-green-900/30 text-green-300'}`}>
@@ -224,14 +222,16 @@ function DailyBatchAnalysis() {
                                             {scanResult.has_validation && (
                                                 <td className="px-6 py-4 text-sm">
                                                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.ground_truth ? 'bg-red-900/30 text-red-300' : 'bg-green-900/30 text-green-300'}`}>
-                                                        {r.ground_truth ? 'Anomaly' : 'Normal'}
+                                                        {r.ground_truth ? 'Scam' : 'Normal'}
                                                     </span>
                                                 </td>
                                             )}
                                             {scanResult.has_validation && (
                                                 <td className="px-6 py-4 text-center">{r.is_correct ? '✅' : '❌'}</td>
                                             )}
-                                            <td className="px-6 py-4 text-sm text-slate-500 italic">{r.top_reason}</td>
+                                            <td className="px-6 py-4 text-sm text-slate-500 italic">
+                                                {r.top_reasons && r.top_reasons.length > 0 ? r.top_reasons[0] : 'None'}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
