@@ -10,9 +10,8 @@ from app.config import (
 
 class DataService:
     """
-    Singleton service responsible for loading the parquet dataset
-    into memory once upon application startup. It provides fast in-memory 
-    lookups for single addresses and batched search queries.
+    Singleton service for loading the parquet dataset
+    load only once upon application startup
     """
 
     def __init__(self):
@@ -45,13 +44,13 @@ class DataService:
         return self._address_data
 
     def get_feature_stats(self, feature: str):
-        """Return pre-computed {mean, std, median} for a feature, or None."""
+        """Return pre-computed mean, std, median for a feature, or None"""
         if self._stats_cache is None:
             self.load_data()
         return self._stats_cache.get(feature)
 
     def get_address_profile(self, address: str) -> Optional[pd.Series]:
-        """Return the single-row profile for the given address, or None."""
+        """Return the single-row profile for the given address, or None"""
         mask = self.address_data['address'].str.lower() == address.lower()
         matches = self.address_data[mask]
 
@@ -66,8 +65,8 @@ class DataService:
 
     def extract_features(self, row: pd.Series) -> Dict[str, Dict[str, float]]:
         """
-        Takes a single Pandas Series (address profile) and splits its features
-        into the four distinct modalities (On-chain, Market, Reddit, Twitter).
+        Takes a single Pandas Series (address profile) and splits features
+        into the four distinct modalities (On-chain, Market, Reddit, Twitter)
         """
         on_chain = {col: float(row.get(col, 0)) for col in ONCHAIN_FEATURES if col in row.index}
         market = {col: float(row.get(col, 0)) for col in MARKET_FEATURES if col in row.index}

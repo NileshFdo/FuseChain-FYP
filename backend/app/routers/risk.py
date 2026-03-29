@@ -20,7 +20,7 @@ router = APIRouter(prefix="/risk", tags=["risk-assessment"])
 
 class ShapFeature(BaseModel):
     """
-    Schema for a single feature's SHAP contribution.
+    Schema for a single feature's SHAP contribution
     """
     feature: str
     display_name: str
@@ -31,9 +31,9 @@ class ShapFeature(BaseModel):
 
 class RiskResult(BaseModel):
     """
-    Comprehensive schema returned for a single address analysis.
+    schema returned for a single address analysis
     Contains the prediction, probability, human-readable narrative, 
-    and all detailed feature values for UI display.
+    and detailed feature values for UI display
     """
     wallet_address: str
     risk_score: float
@@ -86,8 +86,8 @@ class BatchAnalysisResponse(BaseModel):
 @router.get("/analyze/{address}", response_model=RiskResult)
 async def analyze_address(address: str):
     """
-    Analyze a single Ethereum address and return its scam risk score,
-    verdict, SHAP-based top reasons, and feature breakdowns.
+    Analyze a single Ethereum address and return scam risk score,
+    verdict, SHAP-based top reasons, and feature breakdowns
     """
     # Lookup the address profile
     profile = data_service.get_address_profile(address)
@@ -104,10 +104,10 @@ async def analyze_address(address: str):
     narrative = ml_service.generate_narrative(contributions, profile, verdict, float(probability))
     top_shap = ml_service.get_top_shap_features(contributions, profile=profile, n=8)
 
-    # Dictionary of all raw feature values for the UI tables
+    # Dictionary of raw feature values for the UI tables
     features = data_service.extract_features(profile)
 
-    # Flatten the SHAP contributions to send to the frontend seamlessly
+    # Flatten the SHAP contributions to send to the frontend
     flat_shap = {}
     for group in contributions.values():
         flat_shap.update(group)
@@ -131,8 +131,8 @@ async def analyze_address(address: str):
 @router.post("/analyze-batch", response_model=BatchAnalysisResponse)
 async def analyze_batch(file: UploadFile = File(...), threshold: float = 0.5):
     """
-    Upload a CSV with at least an `address` column.
-    Optionally include an `is_scam` column for ground-truth validation.
+    Upload a CSV with address column
+    Optionally include is_scam column for ground-truth validation
     """
     try:
         df = pd.read_csv(file.file)
@@ -187,13 +187,13 @@ async def analyze_batch(file: UploadFile = File(...), threshold: float = 0.5):
             is_correct=is_correct,
         ))
 
-    # Categorize results strictly for the frontend dashboard
+    # Categorize results for the frontend dashboard
     high = sum(1 for r in results if r.risk_score >= 0.75)
     medium = sum(1 for r in results if 0.4 <= r.risk_score < 0.75)
     low = sum(1 for r in results if r.risk_score < 0.4)
 
     validation = None
-    # Calculate performance metrics ONLY if ground-truth labels were provided in the CSV
+    # Calculate performance metrics only if ground-truth labels were provided
     if has_labels and (tp + tn + fp + fn) > 0:
         total = tp + tn + fp + fn
         validation = ValidationMetrics(
@@ -224,7 +224,7 @@ import os
 
 @router.get("/sample-files")
 async def get_sample_files():
-    """Returns available sample files for testing."""
+    """Returns available sample files for testing"""
     return {
         "labeled": [
             {
@@ -242,7 +242,7 @@ async def get_sample_files():
 
 @router.get("/sample-files/{filename}")
 async def download_sample_file(filename: str):
-    """Download a specific sample file."""
+    """Download a specific sample file"""
     from app.config import get_sample_file_path
 
     try:

@@ -47,7 +47,7 @@ app.include_router(risk_router, prefix=API_PREFIX)
 
 @app.get("/")
 async def root():
-    """Root endpoint to acknowledge API is running and provide links."""
+    """Root endpoint"""
     return {
         "name": "FuseChain API",
         "version": "1.0.0",
@@ -57,5 +57,5 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Basic health check endpoint for monitoring."""
+    """health check endpoint"""
     return {"status": "healthy"}
