@@ -32,8 +32,8 @@ LOCAL_SAMPLE_DIR = MODELS_DIR
 
 def get_path(local_path, filename, repo_id, repo_type):
     """
-    First checks if the necessary artifact is available on the local disk.
-    If not found attempts to download it from the Hugging Face Hub.
+    First checks if the necessary artifact is available on the local disk
+    If not found attempts to download it from the Hugging Face Hub
     """
     if local_path.exists():
         print(f"Found local file: {local_path}")
@@ -55,15 +55,15 @@ def get_path(local_path, filename, repo_id, repo_type):
 
 
 def get_model_path():
-    """Retrieve the path to the trained XGBoost model artifact."""
+    """Retrieve the path to the trained XGBoost model artifact"""
     return get_path(LOCAL_MODEL_PATH, MODEL_FILENAME, HF_MODEL_REPO_ID, repo_type=HF_MODEL_REPO_TYPE)
 
 def get_address_data_path():
-    """Retrieve the path to the parquet dataset containing address profiles."""
+    """Retrieve the path to the parquet dataset containing address profiles"""
     return get_path(LOCAL_ADDRESS_DATA_PATH, ADDRESS_DATA_FILENAME, HF_DATA_REPO_ID, repo_type=HF_DATA_REPO_TYPE)
 
 def get_metadata_path():
-    """Retrieve the path to the feature mapping metadata JSON."""
+    """Retrieve the path to the feature mapping metadata JSON"""
     return get_path(LOCAL_METADATA_PATH, METADATA_FILENAME, HF_MODEL_REPO_ID, repo_type=HF_MODEL_REPO_TYPE)
 
 def get_sample_file_path(filename):
@@ -78,14 +78,14 @@ def get_sample_file_path(filename):
 # Load feature lists dynamically from metadata JSON
 
 def _load_feature_metadata():
-    """Load feature groups from address_features_metadata.json."""
+    """Load feature groups from address_features_metadata.json"""
     meta_path = get_metadata_path()
     with open(meta_path, 'r') as f:
         meta = json.load(f)
     return meta
 
 def _auto_display_name(feature_name: str) -> str:
-    """Convert a snake_case feature name to a human-readable display name."""
+    """Convert a snake_case feature name to a human-readable display name"""
     # Remove common suffixes for cleaner names
     name = feature_name
     for prefix in ['market_', 'reddit_', 'twitter_']:

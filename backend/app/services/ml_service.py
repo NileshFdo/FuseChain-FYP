@@ -12,9 +12,8 @@ from app.config import (
 
 class MLService:
     """
-    Singleton service responsible for loading the trained XGBoost model and SHAP explainer
-    into memory. Handles the actual inference logic and generates explainable narratives 
-    based on SHAP output.
+    Singleton service for loading the trained XGBoost model and SHAP explainer into memory
+    Handles the inference logic and generates explainable narratives based on SHAP output
     """
 
     def __init__(self):
@@ -57,8 +56,8 @@ class MLService:
 
     def predict(self, df: pd.DataFrame):
         """
-        Batched inference method.
-        Converts the pandas dataframe to an XGBoost DMatrix for optimized prediction.
+        Batched inference method
+        Converts the pandas dataframe to an XGBoost DMatrix for optimized prediction
         Returns: Tuple(binary_predictions, float_probabilities)
         """
         import xgboost as xgb
@@ -73,7 +72,7 @@ class MLService:
         return predictions, probabilities
 
     def predict_single(self, row: pd.Series):
-        """Convenience: predict for a single address profile row."""
+        """predict for a single address profile row"""
         df = pd.DataFrame([row[self._feature_columns]]).astype(float)
         preds, probs = self.predict(df)
         return int(preds[0]), float(probs[0])
@@ -83,7 +82,7 @@ class MLService:
         return self.explainer.shap_values(X.values, check_additivity=False)
 
     def get_feature_contributions(self, row: pd.Series):
-        """Return SHAP contributions grouped by modality."""
+        """Return SHAP contributions grouped by modality"""
         X = pd.DataFrame([row[self._feature_columns]]).astype(float)
         shap_values = self.explainer.shap_values(X.values, check_additivity=False)[0]
 
@@ -104,7 +103,7 @@ class MLService:
         }
 
     def generate_top_reasons(self, contributions: dict, profile: pd.Series = None, n: int = 5):
-        """Return human-readable top-N reasons from SHAP contributions with rich context."""
+        """Return human-readable top-N reasons from SHAP contributions with rich context"""
         all_contribs = {}
         for group in contributions.values():
             all_contribs.update(group)
@@ -127,7 +126,7 @@ class MLService:
         return reasons
 
     def _build_rich_reason(self, feature: str, display_name: str, value: float, shap_val: float, direction: str):
-        """Build a contextual sentence for a single feature."""
+        """Build a contextual sentence for a single feature"""
         from app.services.data_service import data_service
 
         # Get dataset statistics for comparison
@@ -162,9 +161,9 @@ class MLService:
 
     def generate_narrative(self, contributions: dict, profile: pd.Series, verdict: str, risk_score: float, n: int = 5):
         """
-        Constructs a human-readable narrative explaining 'why' the model made its decision.
-        It identifies the dominant data modality (On-chain vs Twitter vs Reddit, etc.)
-        and crafts an opening sentence, followed by specific details from the top SHAP features.
+        Constructs a human-readable narrative explaining why the model made its decision
+        identifies the dominant data modality (On-chain vs Twitter vs Reddit vs Market)
+        Create an opening sentence, followed by specific details from the top SHAP features
         """
         all_contribs = {}
         modality_impact = {}
@@ -208,7 +207,7 @@ class MLService:
         return opening + details
 
     def get_top_shap_features(self, contributions: dict, profile: pd.Series = None, n: int = 8):
-        """Return top N features by |SHAP| for a bar chart, with modality labels."""
+        """Return top N features by |SHAP| for a bar chart, with modality labels"""
         all_contribs = {}
         feature_modality = {}
         for modality, group in contributions.items():
