@@ -64,7 +64,13 @@ function TestExamples() {
     }, []);
 
     const downloadFile = (filename) => {
-        window.open(`${API_URL}/risk/sample-files/${filename}`, '_blank');
+        const a = document.createElement('a');
+        a.href = `${API_URL}/risk/sample-files/${filename}`;
+        a.download = filename;
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     };
 
     return (
