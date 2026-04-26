@@ -55,13 +55,7 @@ function DailyBatchAnalysis() {
             address: result.wallet_address,
             auto: 'true'
         });
-        const a = document.createElement('a');
-        a.href = `/#single-search?${params.toString()}`;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        window.open(`/#single-search?${params.toString()}`, '_blank');
     };
 
     const getRiskColor = (score) => {
